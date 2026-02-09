@@ -171,6 +171,7 @@ We have several `make` commands available at your convenience:
 * `make clean`: cleans all the installed Go tools, intermediate and generated artifacts.
 * `make`: builds the binary and a test docker image.
 * `make docker.buildx.csi-driver`: build image
+  * `IMG_RESULT="load" PLATFORMS="linux/amd64"`: only build linux/amd64 image, without pushing
 
 There are more commands, take your time to read through the the [Makefile](../Makefile) and [Makefile-buildx](../Makefile.buildx.mk).
 

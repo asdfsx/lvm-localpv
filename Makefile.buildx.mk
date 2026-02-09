@@ -17,9 +17,16 @@
 # Experimental docker feature to build cross platform multi-architecture docker images
 # https://docs.docker.com/buildx/working-with-buildx/
 
+ifneq (${IMAGE_TAG}, )
+  export TAG=${IMAGE_TAG}
+endif
+
 ifeq (${TAG}, )
   export TAG=ci
 endif
+
+# Debug: Print TAG variable
+$(info TAG is: $(TAG))
 
 # default list of platforms for which multiarch image is built
 ifeq (${PLATFORMS}, )
@@ -30,7 +37,7 @@ endif
 ifeq (${IMG_RESULT}, load)
 	export PUSH_ARG="--load"
     # if load is specified, image will be built only for the build machine architecture.
-    export PLATFORMS="local"
+    # export PLATFORMS="local"
 else ifeq (${IMG_RESULT}, cache)
 	# if cache is specified, image will only be available in the build cache, it won't be pushed or loaded
 	# therefore no PUSH_ARG will be specified
@@ -47,6 +54,7 @@ docker.buildx:
 	@if ! docker buildx ls | grep -q container-builder; then\
 		docker buildx create --platform ${PLATFORMS} --name container-builder --use;\
 	fi
+	@echo "docker buildx build --platform ${PLATFORMS} -t $(DOCKERX_IMAGE_NAME) ${BUILD_ARGS} -f $(PWD)/buildscripts/$(COMPONENT)/Dockerfile.buildx . ${PUSH_ARG}"
 	@docker buildx build --platform "${PLATFORMS}" \
 		-t "$(DOCKERX_IMAGE_NAME)" ${BUILD_ARGS} \
 		-f $(PWD)/buildscripts/$(COMPONENT)/Dockerfile.buildx \
