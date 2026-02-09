@@ -170,6 +170,7 @@ We have several `make` commands available at your convenience:
 * `make golint`: comprehensive linter that helps catch potential issues such as coding style problems, possible bugs, and performance issues.
 * `make clean`: cleans all the installed Go tools, intermediate and generated artifacts.
 * `make`: builds the binary and a test docker image.
+* `make docker.buildx.csi-driver`: build image
 
 There are more commands, take your time to read through the the [Makefile](../Makefile) and [Makefile-buildx](../Makefile.buildx.mk).
 
