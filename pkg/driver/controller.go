@@ -52,6 +52,8 @@ const (
 	DefaultCASType string = "lvm-localpv"
 	// LocalPVReplicaCount is the constant used by usage to represent replication factor in LocalPV
 	LocalPVReplicaCount string = "1"
+
+	AnnotationNodeName string = "lvmnodes.local.openebs.io/name"
 )
 
 // controller is the server implementation
@@ -62,6 +64,7 @@ type controller struct {
 
 	indexedLabel string
 
+	kubeClient      kubernetes.Interface
 	k8sNodeInformer cache.SharedIndexInformer
 	lvmNodeInformer cache.SharedIndexInformer
 
@@ -200,6 +203,7 @@ func (cs *controller) init() error {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
+	cs.kubeClient = kubeClient
 	cs.k8sNodeInformer = kubeInformerFactory.Core().V1().Nodes().Informer()
 	cs.lvmNodeInformer = openebsInformerfactory.Local().V1alpha1().LVMNodes().Informer()
 
@@ -364,6 +368,12 @@ func CreateLVMVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 
 		owner = selected[0]
 	}
+
+	// 如果pvc的annotaion里指定了nodename，AnnotationNodeName不为空，如果AnnotationNodeName不等于owner，停止创建
+	if params.AnnotationNodeName != "" && params.AnnotationNodeName != owner {
+		return nil, status.Errorf(codes.ResourceExhausted, "scheduler failed, cannot create the PV on specific node %v", params.AnnotationNodeName)
+	}
+
 	klog.Infof("scheduling the volume %s/%s on node %s",
 		params.VgPattern.String(), volName, owner)
 	volObj, err := volbuilder.NewBuilder().
@@ -405,7 +415,6 @@ func (cs *controller) CreateVolume(
 	ctx context.Context,
 	req *csi.CreateVolumeRequest,
 ) (*csi.CreateVolumeResponse, error) {
-
 	if err := cs.validateVolumeCreateReq(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -415,6 +424,14 @@ func (cs *controller) CreateVolume(
 		return nil, status.Errorf(codes.InvalidArgument,
 			"failed to parse csi volume params: %v", err)
 	}
+
+	// 读取 PVC 的 annotation
+	pvc, err := cs.kubeClient.CoreV1().PersistentVolumeClaims(params.PVCNamespace).Get(ctx, params.PVCName, metav1.GetOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound,
+			"failed to find pvc %v/%v, %v", params.PVCNamespace, params.PVCName, err)
+	}
+	params.AnnotationNodeName = pvc.Annotations[AnnotationNodeName]
 
 	volName := strings.ToLower(req.GetName())
 	size := getRoundedCapacity(req.GetCapacityRange().GetRequiredBytes())

@@ -43,6 +43,8 @@ type VolumeParams struct {
 	PVCNamespace  string
 	PVName        string
 	FormatOptions string
+
+	AnnotationNodeName string
 }
 
 // SnapshotParams holds collection of supported settings that can
