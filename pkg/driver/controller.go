@@ -366,9 +366,10 @@ func CreateLVMVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 			return nil, status.Error(codes.ResourceExhausted, "scheduler failed, not able to select a node to create the PV")
 		}
 
-		// 如果pvc的annotation里没有指定nodename，AnnotationNodeName为空，则 owner = selected[0]
-		// 如果pvc的annotation里指定了nodename，AnnotationNodeName不为空，如果selected里包含了AnnotationNodeName，则 owner = params.AnnotationNodeName
-		// 如果pvc的annotation里指定了nodename，AnnotationNodeName不为空，如果selected不包含AnnotationNodeName，停止创建
+		// Node selection logic:
+		// If nodename is not specified in the PVC annotation, then owner = selected[0]
+		// If nodename is specified in the PVC annotation, and it's in the selected list, then owner = params.AnnotationNodeName
+		// If nodename is specified in the PVC annotation, but not in the selected list, stop creation
 		if params.AnnotationNodeName == "" {
 			owner = selected[0]
 		} else if slices.Contains(selected, params.AnnotationNodeName) {
@@ -430,7 +431,7 @@ func (cs *controller) CreateVolume(
 			"failed to parse csi volume params: %v", err)
 	}
 
-	// 读取 PVC 的 annotation
+	// get pvc's annotation
 	pvc, err := cs.kubeClient.CoreV1().PersistentVolumeClaims(params.PVCNamespace).Get(ctx, params.PVCName, metav1.GetOptions{})
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound,
