@@ -366,12 +366,16 @@ func CreateLVMVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 			return nil, status.Error(codes.ResourceExhausted, "scheduler failed, not able to select a node to create the PV")
 		}
 
-		owner = selected[0]
-	}
-
-	// 如果pvc的annotaion里指定了nodename，AnnotationNodeName不为空，如果AnnotationNodeName不等于owner，停止创建
-	if params.AnnotationNodeName != "" && params.AnnotationNodeName != owner {
-		return nil, status.Errorf(codes.ResourceExhausted, "scheduler failed, cannot create the PV on specific node %v", params.AnnotationNodeName)
+		// 如果pvc的annotation里没有指定nodename，AnnotationNodeName为空，则 owner = selected[0]
+		// 如果pvc的annotation里指定了nodename，AnnotationNodeName不为空，如果selected里包含了AnnotationNodeName，则 owner = params.AnnotationNodeName
+		// 如果pvc的annotation里指定了nodename，AnnotationNodeName不为空，如果selected不包含AnnotationNodeName，停止创建
+		if params.AnnotationNodeName == "" {
+			owner = selected[0]
+		} else if slices.Contains(selected, params.AnnotationNodeName) {
+			owner = params.AnnotationNodeName
+		} else {
+			return nil, status.Errorf(codes.ResourceExhausted, "scheduler failed, cannot create the PV on specific node %v", params.AnnotationNodeName)
+		}
 	}
 
 	klog.Infof("scheduling the volume %s/%s on node %s",
